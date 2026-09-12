@@ -1,0 +1,7 @@
+[
+  { "id": "a1", "track": "A", "startMs": 0, "endMs": 2000, "text": "你好世界" },
+  { "id": "a2", "track": "A", "startMs": 1500, "endMs": 4000, "text": "测试字幕" },
+  { "id": "b1", "track": "B", "startMs": 1700, "endMs": 5000, "text": "B轨字幕" },
+  { "id": "b2", "track": "B", "startMs": 30000, "endMs": 30500, "text": "这一句台词实在是太长了根本读不完" },
+  { "id": "a3", "track": "A", "startMs": 60000, "endMs": 64000, "text": "正常字幕" }
+]
