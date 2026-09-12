@@ -1,5 +1,5 @@
 import { REASONS } from './types';
-import type { Reason, RiskEntry, Subtitle } from './types';
+import type { Reason, RiskEntry, Subtitle, Track } from './types';
 
 /** 时间带上界：4 小时 */
 export const MAX_END_MS = 14_400_000;
@@ -76,6 +76,67 @@ export function validateSubtitles(data: unknown): ValidationResult {
     }
   }
   return { ok: true, subtitles: data as Subtitle[] };
+}
+
+/** 整轨偏移被拒时的越界信息（按统一排序的首个越界字幕） */
+export interface ShiftViolation {
+  /** 首个越界字幕的 id */
+  id: string;
+  /** 调整后该字幕的开始时间 */
+  nextStartMs: number;
+  /** 调整后该字幕的结束时间 */
+  nextEndMs: number;
+  /** 越界方向：低于零点或超过四小时上限 */
+  kind: 'below-zero' | 'above-limit';
+}
+
+export type ShiftTrackResult =
+  | { ok: true; subtitles: Subtitle[] }
+  | { ok: false; violation: ShiftViolation };
+
+/**
+ * 将指定轨全部字幕的开始与结束时间整体平移 offsetMs 毫秒。
+ * 以原字幕对象生成候选集合：非目标轨原样保留，目标轨为新对象，
+ * id、track、text 不变。任一候选越过零点或四小时上限即整次拒绝。
+ */
+export function shiftTrack(
+  subtitles: Subtitle[],
+  track: Track,
+  offsetMs: number,
+): ShiftTrackResult {
+  if (!Number.isInteger(offsetMs) || offsetMs === 0) {
+    throw new Error('偏移量必须是非零整数毫秒');
+  }
+  const targets = subtitles
+    .filter((s) => s.track === track)
+    .sort(compareSubtitles);
+  if (targets.length === 0) {
+    return { ok: true, subtitles };
+  }
+  for (const s of targets) {
+    const nextStartMs = s.startMs + offsetMs;
+    const nextEndMs = s.endMs + offsetMs;
+    if (nextStartMs < 0) {
+      return {
+        ok: false,
+        violation: { id: s.id, nextStartMs, nextEndMs, kind: 'below-zero' },
+      };
+    }
+    if (nextEndMs > MAX_END_MS) {
+      return {
+        ok: false,
+        violation: { id: s.id, nextStartMs, nextEndMs, kind: 'above-limit' },
+      };
+    }
+  }
+  return {
+    ok: true,
+    subtitles: subtitles.map((s) =>
+      s.track === track
+        ? { ...s, startMs: s.startMs + offsetMs, endMs: s.endMs + offsetMs }
+        : s,
+    ),
+  };
 }
 
 /**
