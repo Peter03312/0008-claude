@@ -7,6 +7,12 @@ const valid = [
   { id: 'b1', track: 'B', startMs: 1700, endMs: 5000, text: 'B轨字幕' },
 ];
 
+// 仅含 A 轨的合法文件
+const onlyA = [
+  { id: 'a1', track: 'A', startMs: 0, endMs: 2000, text: '你好世界' },
+  { id: 'a2', track: 'A', startMs: 1500, endMs: 4000, text: '测试字幕' },
+];
+
 async function upload(page: Page, data: unknown, name = 'subs.json') {
   await page.getByTestId('file-input').setInputFiles({
     name,
@@ -175,4 +181,74 @@ test('重新导入非法文件清空撤销快照并按原行为清除结果', as
   await expect(page.getByTestId('error')).toContainText('重复');
   await expect(page.locator('[data-sub-id]')).toHaveCount(0);
   await expect(page.getByTestId('track-shift')).toHaveCount(0);
+});
+
+test('仅含 A 轨：对空 B 轨偏移是空操作，不启用撤销也不改动时间', async ({
+  page,
+}) => {
+  await upload(page, onlyA);
+  await expect(page.getByTestId('shift-empty-note')).toHaveCount(0);
+
+  await applyShift(page, 'B', '1000');
+  // 没有任何时间变化
+  await expect(page.locator('[data-sub-id="a1"]')).toHaveAttribute(
+    'title',
+    /00:00:00\.000 → 00:00:02\.000/,
+  );
+  // 空操作不记录撤销
+  await expect(page.getByTestId('shift-undo')).toBeDisabled();
+  // 选中空轨时有界面提示
+  await expect(page.getByTestId('shift-empty-note')).toContainText('B 轨当前无字幕');
+  await expect(page.getByTestId('shift-empty-note')).toContainText('不会记录撤销');
+});
+
+test('仅含 A 轨：先成功调整 A 轨再偏移空 B 轨，撤销仍能还原最近一次实际调整', async ({
+  page,
+}) => {
+  await upload(page, onlyA);
+  await applyShift(page, 'A', '1000');
+  await expect(page.getByTestId('shift-undo')).toBeEnabled();
+  await expect(page.locator('[data-sub-id="a1"]')).toHaveAttribute(
+    'title',
+    /00:00:01\.000 → 00:00:03\.000/,
+  );
+
+  // 对空 B 轨偏移：不覆盖撤销快照、不改动任何字幕
+  await applyShift(page, 'B', '1000');
+  await expect(page.locator('[data-sub-id="a1"]')).toHaveAttribute(
+    'title',
+    /00:00:01\.000 → 00:00:03\.000/,
+  );
+  await expect(page.getByTestId('shift-undo')).toBeEnabled();
+
+  // 撤销恢复的是 A 轨调整前的状态
+  await page.getByTestId('shift-undo').click();
+  await expect(page.locator('[data-sub-id="a1"]')).toHaveAttribute(
+    'title',
+    /00:00:00\.000 → 00:00:02\.000/,
+  );
+  await expect(page.getByTestId('shift-undo')).toBeDisabled();
+});
+
+test('仅含 A 轨：A 轨越界拒绝后偏移空 B 轨，越界说明与页面信息保留', async ({
+  page,
+}) => {
+  await upload(page, onlyA);
+  // a1.startMs = 0，前移 100ms 越过零点
+  await applyShift(page, 'A', '-100');
+  await expect(page.getByTestId('shift-error')).toContainText('整次调整已拒绝');
+  await expect(page.getByTestId('shift-error')).toContainText('a1');
+
+  // 再对空 B 轨偏移：无任何改动，且不应清除首个越界说明
+  await applyShift(page, 'B', '1000');
+  await expect(page.getByTestId('shift-error')).toBeVisible();
+  await expect(page.getByTestId('shift-error')).toContainText('整次调整已拒绝');
+  await expect(page.getByTestId('shift-error')).toContainText('a1');
+  await expect(page.locator('[data-sub-id="a1"]')).toHaveAttribute(
+    'title',
+    /00:00:00\.000 → 00:00:02\.000/,
+  );
+  await expect(page.getByTestId('summary')).toContainText('共 2 条字幕');
+  // 失败与空操作都不产生撤销快照
+  await expect(page.getByTestId('shift-undo')).toBeDisabled();
 });

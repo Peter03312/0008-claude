@@ -91,13 +91,17 @@ export interface ShiftViolation {
 }
 
 export type ShiftTrackResult =
-  | { ok: true; subtitles: Subtitle[] }
+  | { ok: true; changed: true; subtitles: Subtitle[] }
+  | { ok: true; changed: false; subtitles: Subtitle[] }
   | { ok: false; violation: ShiftViolation };
 
 /**
  * 将指定轨全部字幕的开始与结束时间整体平移 offsetMs 毫秒。
  * 以原字幕对象生成候选集合：非目标轨原样保留，目标轨为新对象，
  * id、track、text 不变。任一候选越过零点或四小时上限即整次拒绝。
+ *
+ * 目标轨无字幕时没有任何时间发生变化，以 changed: false 标记此次空操作
+ * （原数组原样返回），调用方不得将其记为一次成功调整。
  */
 export function shiftTrack(
   subtitles: Subtitle[],
@@ -111,7 +115,8 @@ export function shiftTrack(
     .filter((s) => s.track === track)
     .sort(compareSubtitles);
   if (targets.length === 0) {
-    return { ok: true, subtitles };
+    // 空轨：没有任何字幕可调整，返回空操作标记而非成功调整
+    return { ok: true, changed: false, subtitles };
   }
   for (const s of targets) {
     const nextStartMs = s.startMs + offsetMs;
@@ -131,6 +136,7 @@ export function shiftTrack(
   }
   return {
     ok: true,
+    changed: true,
     subtitles: subtitles.map((s) =>
       s.track === track
         ? { ...s, startMs: s.startMs + offsetMs, endMs: s.endMs + offsetMs }

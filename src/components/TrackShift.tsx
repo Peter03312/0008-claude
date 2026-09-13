@@ -6,13 +6,22 @@ interface Props {
   canUndo: boolean;
   /** 上次失败原因（输入非法或整次越界拒绝） */
   error: string | null;
+  /** 各轨当前字幕条数，用于提示空轨 */
+  trackCounts: Record<Track, number>;
   onShift: (track: Track, offsetInput: string) => void;
   onUndo: () => void;
 }
 
-export default function TrackShift({ canUndo, error, onShift, onUndo }: Props) {
+export default function TrackShift({
+  canUndo,
+  error,
+  trackCounts,
+  onShift,
+  onUndo,
+}: Props) {
   const [track, setTrack] = useState<Track>('A');
   const [offset, setOffset] = useState('');
+  const trackEmpty = trackCounts[track] === 0;
 
   return (
     <form
@@ -31,13 +40,23 @@ export default function TrackShift({ canUndo, error, onShift, onUndo }: Props) {
             type="button"
             className={track === t ? 'active' : ''}
             data-testid={`shift-track-${t}`}
+            data-empty={trackCounts[t] === 0}
             aria-pressed={track === t}
             onClick={() => setTrack(t)}
           >
-            {t} 轨
+            {t} 轨（{trackCounts[t]}）
           </button>
         ))}
       </div>
+      {trackEmpty && (
+        <span
+          className="shift-note"
+          role="status"
+          data-testid="shift-empty-note"
+        >
+          {track} 轨当前无字幕，执行偏移不会改变任何时间，也不会记录撤销。
+        </span>
+      )}
       <input
         className="shift-offset"
         data-testid="shift-offset-input"

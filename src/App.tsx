@@ -83,6 +83,11 @@ export default function App() {
         );
         return;
       }
+      // 目标轨为空：没有任何时间变化，不是一次成功调整——
+      // 不写撤销快照、不替换数据、不清空越界说明
+      if (!result.changed) {
+        return;
+      }
       // 成功：保存调整前快照，以候选集合替换当前数据，复用既有校核规则
       setSnapshot({ subtitles, risks, selectedId });
       setSubtitles(result.subtitles);
@@ -130,6 +135,10 @@ export default function App() {
           <TrackShift
             canUndo={snapshot !== null}
             error={shiftError}
+            trackCounts={{
+              A: subtitles.filter((s) => s.track === 'A').length,
+              B: subtitles.filter((s) => s.track === 'B').length,
+            }}
             onShift={handleShift}
             onUndo={handleUndo}
           />

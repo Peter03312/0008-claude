@@ -68,12 +68,26 @@ describe('shiftTrack：仅目标轨偏移', () => {
     expect(r.subtitles.map((s) => s.id)).toEqual(['late', 'early', 'b']);
   });
 
-  it('空文件或目标轨无字幕时成功且不产生改动', () => {
-    expect(shiftTrack([], 'A', 1000)).toEqual({ ok: true, subtitles: [] });
+  it('实际发生调整时标记 changed，且结果为全新候选集合', () => {
+    const input = [sub('a1', 'A', 1000, 2000)];
+    const r = shiftTrack(input, 'A', 100);
+    expect(r).toMatchObject({ ok: true, changed: true });
+  });
+
+  it('空文件或目标轨无字幕时为空操作（changed: false），不记为成功调整', () => {
+    expect(shiftTrack([], 'A', 1000)).toEqual({
+      ok: true,
+      changed: false,
+      subtitles: [],
+    });
     const input = [sub('b1', 'B', 100, 200)];
     const r = shiftTrack(input, 'A', -50);
     expect(r.ok).toBe(true);
-    if (r.ok) expect(r.subtitles).toBe(input);
+    if (r.ok) {
+      expect(r.changed).toBe(false);
+      // 原数组原样返回，不产生任何新对象
+      expect(r.subtitles).toBe(input);
+    }
   });
 });
 

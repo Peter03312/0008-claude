@@ -126,6 +126,15 @@ h1 {
   font-size: 13px;
 }
 
+.shift-note {
+  font-size: 13px;
+  color: #ad6800;
+}
+
+.shift-tracks button[data-empty='true'] {
+  opacity: 0.65;
+}
+
 .hint {
   color: #777;
   margin-top: 24px;
